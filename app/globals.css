@@ -1,0 +1,47 @@
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f4f6f8;
+  color: #111;
+}
+
+.section {
+  padding: 60px 20px;
+}
+
+.center {
+  max-width: 1100px;
+  margin: auto;
+}
+
+.card {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+button {
+  padding: 10px 16px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+button:hover {
+  background: #1e40af;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 8px;
+  margin-top: 6px;
+}
