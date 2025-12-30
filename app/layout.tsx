@@ -11,6 +11,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // This allows <html> and <body> tags to render correctly
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans antialiased`}>

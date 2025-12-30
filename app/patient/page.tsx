@@ -6,8 +6,8 @@ import { Calendar, FileText, Zap } from "lucide-react"
 
 export default function PatientDashboard() {
   const appointments = [
-    { id: 1, doctor: "Dr. Tanya", date: "Dec 29, 2024", time: "2:00 PM", status: "Confirmed" },
-    { id: 2, doctor: "Dr. Ramesh", date: "Jan 5, 2025", time: "10:30 AM", status: "Pending" },
+    { id: 1, doctor: "Dr. Sarah Miller", date: "Dec 29, 2024", time: "2:00 PM", status: "Confirmed" },
+    { id: 2, doctor: "Dr. James Wilson", date: "Jan 5, 2025", time: "10:30 AM", status: "Pending" },
   ]
 
   return (

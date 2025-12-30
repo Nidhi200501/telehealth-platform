@@ -10,9 +10,9 @@ export default function DoctorDashboard() {
   const [prescription, setPrescription] = useState("")
 
   const appointments = [
-    { id: 1, patient: "Ansh Kumar", time: "2:00 PM", status: "In Progress" },
-    { id: 2, patient: "Mukesh Patel", time: "3:30 PM", status: "Upcoming" },
-    { id: 3, patient: "Manya Singh", time: "4:00 PM", status: "Upcoming" },
+    { id: 1, patient: "John Doe", time: "2:00 PM", status: "In Progress" },
+    { id: 2, patient: "Emma Wilson", time: "3:30 PM", status: "Upcoming" },
+    { id: 3, patient: "Michael Chen", time: "4:00 PM", status: "Upcoming" },
   ]
 
   return (
