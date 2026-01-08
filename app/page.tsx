@@ -3,6 +3,7 @@
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { useState } from "react"
 import {
   Heart,
   Video,
@@ -16,12 +17,53 @@ import {
   Clock,
   Shield,
   ArrowRight,
+  X,
 } from "lucide-react"
 
 export default function Home() {
+  const [isConsultModalOpen, setIsConsultModalOpen] = useState(false)
+  const [symptoms, setSymptoms] = useState("")
+
+  const handleAnalyze = () => {
+    console.log("[v0] Analyzing symptoms:", symptoms)
+    // Analyze logic will be added here
+  }
+
   return (
     <main className="min-h-screen pt-16">
       <Navbar />
+
+      {/* Consultation Modal */}
+      {isConsultModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-background border border-primary/20 rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Describe Your Symptoms</h2>
+              <button
+                onClick={() => setIsConsultModalOpen(false)}
+                className="p-1 hover:bg-muted rounded-lg transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <textarea
+              value={symptoms}
+              onChange={(e) => setSymptoms(e.target.value)}
+              placeholder="Enter your symptoms here... For example: headache, fever, cough"
+              className="w-full h-32 p-4 border border-primary/20 rounded-xl bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none mb-6 text-foreground placeholder:text-muted-foreground"
+            />
+
+            <Button
+              onClick={handleAnalyze}
+              disabled={!symptoms.trim()}
+              className="w-full gradient-primary text-white border-0 hover:shadow-lg hover:shadow-primary/50 transition-all duration-300"
+            >
+              Analyze
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-28 pb-20 px-4 md:pt-32 md:pb-24">
@@ -43,10 +85,11 @@ export default function Home() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-12">
                 <Button
+                  onClick={() => setIsConsultModalOpen(true)}
                   size="lg"
                   className="gradient-primary text-white border-0 hover:shadow-lg hover:shadow-primary/50 transition-all duration-300 group"
                 >
-                  Book Consultation
+                  CONSULT NOW
                   <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
                 </Button>
                 <Button
