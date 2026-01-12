@@ -3,7 +3,7 @@
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { useState } from "react"
+import { useState, useRef } from "react"
 import {
   Heart,
   Video,
@@ -18,11 +18,67 @@ import {
   Shield,
   ArrowRight,
   X,
+  Mic,
 } from "lucide-react"
 
 export default function Home() {
   const [isConsultModalOpen, setIsConsultModalOpen] = useState(false)
   const [symptoms, setSymptoms] = useState("")
+  const [isListening, setIsListening] = useState(false)
+  const recognitionRef = useRef(null)
+
+  const handleStartListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      alert("Speech Recognition not supported in your browser")
+      return
+    }
+
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = "en-US"
+    recognitionRef.current = recognition
+
+    recognition.onstart = () => {
+      setIsListening(true)
+    }
+
+    recognition.onresult = (event) => {
+      let interimTranscript = ""
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          setSymptoms((prev) => prev + (prev ? " " : "") + transcript)
+        } else {
+          interimTranscript += transcript
+        }
+      }
+      if (interimTranscript) {
+        const textArea = document.querySelector("[data-symptoms-input]")
+        if (textArea) {
+          textArea.value = symptoms + " " + interimTranscript
+        }
+      }
+    }
+
+    recognition.onerror = (event) => {
+      console.log("[v0] Speech error:", event.error)
+      setIsListening(false)
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+    }
+
+    recognition.start()
+  }
 
   const handleAnalyze = () => {
     console.log("[v0] Analyzing symptoms:", symptoms)
@@ -48,11 +104,26 @@ export default function Home() {
             </div>
 
             <textarea
+              data-symptoms-input
               value={symptoms}
               onChange={(e) => setSymptoms(e.target.value)}
               placeholder="Enter your symptoms here... For example: headache, fever, cough"
-              className="w-full h-32 p-4 border border-primary/20 rounded-xl bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none mb-6 text-foreground placeholder:text-muted-foreground"
+              className="w-full h-32 p-4 border border-primary/20 rounded-xl bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none mb-4 text-foreground placeholder:text-muted-foreground"
             />
+
+            <div className="flex gap-3 mb-6">
+              <button
+                onClick={handleStartListening}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 font-medium ${
+                  isListening
+                    ? "bg-primary text-white border-primary shadow-lg shadow-primary/50 animate-pulse"
+                    : "bg-muted/50 border-primary/20 text-foreground hover:bg-muted hover:border-primary/40"
+                }`}
+              >
+                <Mic size={18} />
+                {isListening ? "Hearing you..." : "Speak"}
+              </button>
+            </div>
 
             <Button
               onClick={handleAnalyze}
