@@ -3,7 +3,7 @@
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
   Heart,
   Video,
@@ -20,12 +20,20 @@ import {
   X,
   Mic,
 } from "lucide-react"
+import { FloatingChatbot } from "@/components/floating-chatbot"
 
 export default function Home() {
   const [isConsultModalOpen, setIsConsultModalOpen] = useState(false)
   const [symptoms, setSymptoms] = useState("")
   const [isListening, setIsListening] = useState(false)
   const recognitionRef = useRef(null)
+
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatStep, setChatStep] = useState("name") // name, age, gender, symptoms
+  const [userData, setUserData] = useState({ name: "", age: "", gender: "" })
+  const [currentInput, setCurrentInput] = useState("")
+  const messagesEndRef = useRef(null)
 
   const handleStartListening = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -82,7 +90,128 @@ export default function Home() {
 
   const handleAnalyze = () => {
     console.log("[v0] Analyzing symptoms:", symptoms)
-    // Analyze logic will be added here
+  }
+
+  const initializeChatbot = () => {
+    setChatMessages([
+      {
+        id: 1,
+        text: "Hello! Welcome to TeleHealth AI Assistant. To help you better, I need some information. What is your name?",
+        sender: "bot",
+      },
+    ])
+    setChatStep("name")
+    setUserData({ name: "", age: "", gender: "" })
+    setCurrentInput("")
+    setIsChatbotOpen(true)
+  }
+
+  const handleChatSubmit = () => {
+    if (!currentInput.trim()) return
+
+    const newMessage = {
+      id: chatMessages.length + 1,
+      text: currentInput,
+      sender: "user",
+    }
+
+    const updatedMessages = [...chatMessages, newMessage]
+    setChatMessages(updatedMessages)
+    setCurrentInput("")
+
+    let botResponse = ""
+    let nextStep = chatStep
+
+    if (chatStep === "name") {
+      setUserData((prev) => ({ ...prev, name: currentInput }))
+      botResponse = `Nice to meet you, ${currentInput}! How old are you?`
+      nextStep = "age"
+    } else if (chatStep === "age") {
+      setUserData((prev) => ({ ...prev, age: currentInput }))
+      botResponse = "Thank you! Are you Male, Female, or Prefer not to say?"
+      nextStep = "gender"
+    } else if (chatStep === "gender") {
+      setUserData((prev) => ({ ...prev, gender: currentInput }))
+      botResponse = `Got it, ${userData.name}. Now, what symptoms are you experiencing or what happened to you? Please describe in detail.`
+      nextStep = "symptoms"
+    } else if (chatStep === "symptoms") {
+      botResponse = `Thank you for sharing your symptoms, ${userData.name}. Based on what you've told me:
+
+**Your Information:**
+- Name: ${userData.name}
+- Age: ${userData.age}
+- Gender: ${userData.gender}
+- Symptoms: ${currentInput}
+
+**Analysis:**
+Based on your symptoms, here are some recommendations:
+1. Stay hydrated and get adequate rest
+2. Monitor your symptoms for any changes
+3. Consider consulting with a female doctor for professional medical advice
+4. Avoid self-medication and follow proper healthcare guidelines
+
+**Next Steps:**
+- You can export this conversation as a PDF to remember the details
+- Book a consultation with our expert female doctors
+- Contact our 24/7 support if symptoms worsen
+
+Is there anything else you'd like to know?`
+      nextStep = "symptoms"
+    }
+
+    setChatStep(nextStep)
+    setTimeout(() => {
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: prev.length + 1,
+          text: botResponse,
+          sender: "bot",
+        },
+      ])
+    }, 500)
+  }
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [chatMessages])
+
+  const exportChatToPDF = () => {
+    const chatContent = chatMessages
+      .map((msg) => `${msg.sender === "bot" ? "Assistant" : "You"}:\n${msg.text}\n`)
+      .join("\n---\n\n")
+
+    const pdfContent = `
+TeleHealth - Chat History
+Date: ${new Date().toLocaleDateString()}
+Time: ${new Date().toLocaleTimeString()}
+
+User Information:
+- Name: ${userData.name}
+- Age: ${userData.age}
+- Gender: ${userData.gender}
+
+---CONVERSATION---
+
+${chatContent}
+
+---END OF CONVERSATION---
+
+This chat has been exported from TeleHealth AI Assistant.
+For medical emergencies, please contact emergency services immediately.
+    `
+
+    const element = document.createElement("a")
+    element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(pdfContent))
+    element.setAttribute("download", `TeleHealth-Chat-${Date.now()}.txt`)
+    element.style.display = "none"
+    document.body.appendChild(element)
+    element.click()
+    document.body.removeChild(element)
   }
 
   return (
@@ -530,6 +659,7 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
+              onClick={() => initializeChatbot()}
               size="lg"
               className="gradient-primary text-white border-0 hover:shadow-lg hover:shadow-primary/50 transition-all duration-300 group"
             >
@@ -596,6 +726,9 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {/* Floating Chatbot Widget */}
+      <FloatingChatbot />
     </main>
   )
 }
