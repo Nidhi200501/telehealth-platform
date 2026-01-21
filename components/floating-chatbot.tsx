@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { X, Send, Download } from "lucide-react"
+import { X, Send, Download, Mic } from "lucide-react"
 import jsPDF from "jspdf"
 
 interface ChatMessage {
@@ -22,7 +22,10 @@ export function FloatingChatbot() {
   const [chatStep, setChatStep] = useState<"name" | "age" | "gender" | "symptoms">("name")
   const [userData, setUserData] = useState<UserData>({ name: "", age: "", gender: "" })
   const [currentInput, setCurrentInput] = useState("")
+  const [severity, setSeverity] = useState<"mild" | "moderate" | "severe">("mild")
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [isListening, setIsListening] = useState(false)
+  const recognitionRef = useRef<any>(null)
 
   const initializeChatbot = () => {
     setChatMessages([
@@ -39,6 +42,10 @@ export function FloatingChatbot() {
   }
 
   const handleChatSubmit = () => {
+    if (isListening && recognitionRef.current) {
+    recognitionRef.current.stop()
+    setIsListening(false)
+  }
     if (!currentInput.trim()) return
 
     const newMessage = {
@@ -74,21 +81,29 @@ export function FloatingChatbot() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: userData.name,
-          age: userData.age,
-          gender: userData.gender,
-          symptoms: currentInput,
-        }),
+  name: userData.name,
+  age: userData.age,
+  gender: userData.gender,
+  messages: updatedMessages.map(m => ({
+    role: m.sender === "user" ? "user" : "assistant",
+    content: m.text
+  }))
+}),
       })
 
       const data = await res.json()
-
+      if (["mild", "moderate", "severe"].includes(data.severity)) {
+  setSeverity(data.severity)
+}
       setChatMessages((prev) => [
         ...prev,
         {
           id: prev.length + 1,
           sender: "bot",
-          text: data.reply,
+          text: Array.isArray(data.reply)
+        ? data.reply.map((p: string) => `• ${p}`).join("\n")
+        : String(data.reply),
+      
         },
       ])
     } catch (err) {
@@ -130,81 +145,222 @@ if (chatStep !== "symptoms") {
   useEffect(() => {
     scrollToBottom()
   }, [chatMessages])
+  useEffect(() => {
+  if (typeof window === "undefined") return
 
-  const exportChatToPDF = () => {
-    const doc = new jsPDF()
-    const pageHeight = doc.internal.pageSize.height
-    const pageWidth = doc.internal.pageSize.width
-    let yPosition = 20
+  const SpeechRecognition =
+    (window as any).SpeechRecognition ||
+    (window as any).webkitSpeechRecognition
 
-    // Title and metadata
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(16)
-    doc.text("TeleHealth - Chat History", 20, yPosition)
+  if (!SpeechRecognition) {
+  console.warn("Speech recognition not supported in this browser")
+  return
+}
 
-    yPosition += 10
-    doc.setFontSize(10)
-    doc.setFont("helvetica", "normal")
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, yPosition)
-    yPosition += 5
-    doc.text(`Time: ${new Date().toLocaleTimeString()}`, 20, yPosition)
+  const recognition = new SpeechRecognition()
+  recognition.lang = "en-US"
+  recognition.interimResults = false
+  recognition.continuous = false
 
-    yPosition += 10
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(11)
-    doc.text("User Information:", 20, yPosition)
-
-    yPosition += 6
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(10)
-    doc.text(`Name: ${userData.name}`, 20, yPosition)
-    yPosition += 5
-    doc.text(`Age: ${userData.age}`, 20, yPosition)
-    yPosition += 5
-    doc.text(`Gender: ${userData.gender}`, 20, yPosition)
-
-    yPosition += 10
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(11)
-    doc.text("Conversation:", 20, yPosition)
-
-    yPosition += 8
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(10)
-
-    // Add chat messages
-    chatMessages.forEach((message) => {
-      const sender = message.sender === "bot" ? "Assistant" : "You"
-      const label = `${sender}:`
-
-      // Check if we need a new page
-      if (yPosition > pageHeight - 20) {
-        doc.addPage()
-        yPosition = 20
-      }
-
-      doc.setFont("helvetica", "bold")
-      doc.text(label, 20, yPosition)
-      yPosition += 5
-
-      doc.setFont("helvetica", "normal")
-      const lines = doc.splitTextToSize(message.text, pageWidth - 40)
-      doc.text(lines, 25, yPosition)
-      yPosition += lines.length * 5 + 5
-    })
-
-    // Footer
-    yPosition += 5
-    doc.setFont("helvetica", "italic")
-    doc.setFontSize(9)
-    doc.text("This chat has been exported from TeleHealth AI Assistant.", 20, yPosition)
-    yPosition += 4
-    doc.text("For medical emergencies, please contact emergency services immediately.", 20, yPosition)
-
-    // Save the PDF
-    doc.save(`TeleHealth-Chat-${Date.now()}.pdf`)
+  recognition.onresult = (event: any) => {
+    const transcript = event.results[0][0].transcript
+    setCurrentInput(prev => (prev ? prev + " " + transcript : transcript))
   }
 
+  recognition.onend = () => {
+    setIsListening(false)
+  }
+
+  recognitionRef.current = recognition
+}, [])
+
+  function cleanForPDF(text: unknown): string {
+  if (Array.isArray(text)) {
+    return text.map(t => `• ${t}`).join("\n")
+  }
+
+  if (typeof text !== "string") {
+    return ""
+  }
+
+  return text
+    .replace(/[^\x20-\x7E\n]/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}
+
+const handleMicClick = () => {
+  if (!recognitionRef.current) {
+    alert("Speech recognition is not supported in this browser.")
+    return
+  }
+
+  if (isListening) {
+    recognitionRef.current.stop()
+    setIsListening(false)
+  } else {
+    recognitionRef.current.start()
+    setIsListening(true)
+  }
+}
+
+const exportChatToPDF = () => {
+  const doc = new jsPDF()
+  // ===== SEVERITY BADGE =====
+let badgeColor: [number, number, number] = [0, 160, 0]
+let badgeText = "MILD"
+
+if (severity === "moderate") {
+  badgeColor = [255, 165, 0]
+  badgeText = "MODERATE"
+}
+
+if (severity === "severe") {
+  badgeColor = [220, 20, 60]
+  badgeText = "SEVERE"
+}
+
+doc.setFillColor(...badgeColor)
+doc.rect(doc.internal.pageSize.width - 55, 10, 40, 10, "F")
+
+doc.setTextColor(255, 255, 255)
+doc.setFontSize(9)
+doc.text(badgeText, doc.internal.pageSize.width - 35, 17, { align: "center" })
+
+doc.setTextColor(0, 0, 0) // reset color
+  // ===== Header Background =====
+doc.setFillColor(180, 205, 235)
+doc.rect(0, 0, doc.internal.pageSize.width, 26, "F")
+  const pageHeight = doc.internal.pageSize.height
+  const pageWidth = doc.internal.pageSize.width
+  const marginX = 20
+  const bottomMargin = 30
+  let yPosition = 19
+  // ===== Title =====
+  doc.setTextColor(20, 60, 120)
+  doc.setFont("helvetica", "bold")
+  doc.setFontSize(16)
+doc.text("TeleHealth – Medical Consultation Summary", marginX, yPosition)
+
+yPosition += 6
+doc.setFontSize(11)
+doc.setFont("helvetica", "bold")
+doc.setTextColor(...badgeColor)
+doc.text(`Severity: ${badgeText}`, marginX, yPosition)
+doc.setTextColor(0, 0, 0)
+doc.setFont("helvetica", "normal")
+yPosition += 8   
+doc.setFontSize(10)
+doc.text(`Date: ${new Date().toLocaleDateString()}`, marginX, yPosition)
+  yPosition += 5
+  doc.text(`Time: ${new Date().toLocaleTimeString()}`, marginX, yPosition)
+
+  // ===== Patient Info =====
+  yPosition += 10
+  doc.setFont("helvetica", "bold")
+  doc.setFontSize(11)
+  doc.text("Patient Information", marginX, yPosition)
+
+  yPosition += 6
+  doc.setFont("helvetica", "normal")
+  doc.setFontSize(10)
+  doc.text(`Name: ${userData.name}`, marginX, yPosition)
+  yPosition += 5
+  doc.text(`Age: ${userData.age}`, marginX, yPosition)
+  yPosition += 5
+  doc.text(`Gender: ${userData.gender}`, marginX, yPosition)
+
+  // ===== Conversation =====
+  yPosition += 10
+  doc.setFont("helvetica", "bold")
+  doc.text("Consultation Notes", marginX, yPosition)
+  yPosition += 8
+doc.setFont("helvetica", "bold")
+doc.text("Symptoms Reported", marginX, yPosition)
+
+yPosition += 6
+doc.setFont("helvetica", "normal")
+const symptomIndex = chatMessages.findIndex(
+  (m, i) =>
+    m.sender === "user" &&
+    chatMessages.slice(0, i).some(
+      prev => prev.sender === "bot" && prev.text.includes("what symptoms")
+    )
+)
+
+const symptomMessage =
+  symptomIndex === -1 ? null : chatMessages[symptomIndex]
+
+if (symptomMessage) {
+  doc.text(`• ${symptomMessage.text}`, marginX, yPosition)
+}
+
+yPosition += 10
+
+  yPosition += 8
+  doc.setFont("helvetica", "normal")
+
+const medicalMessages =
+  symptomIndex === -1
+    ? []
+    : chatMessages.slice(symptomIndex + 1).filter(m => m.sender === "bot")
+doc.setFont("helvetica", "bold")
+doc.text("AI Guidance", marginX, yPosition)
+yPosition += 6
+
+doc.setFont("helvetica", "normal")
+
+medicalMessages.forEach((message) => {
+  const cleanText = cleanForPDF(message.text)
+
+  const lines = doc.splitTextToSize(
+    cleanText,
+    pageWidth - marginX * 2
+  )
+
+  if (yPosition + lines.length * 6 > pageHeight - bottomMargin) {
+    doc.addPage()
+    yPosition = 20
+  }
+
+  doc.text(lines, marginX, yPosition)
+  yPosition += lines.length * 6 + 6
+})
+
+  // ===== DISCLAIMER (FIXED) =====
+  const disclaimerText =
+    "Disclaimer: This document contains AI-generated health guidance for informational purposes only and is not a medical diagnosis. Please consult a licensed healthcare professional for medical advice. For medical emergencies, contact local emergency services immediately."
+
+  const disclaimerLines = doc.splitTextToSize(
+    disclaimerText,
+    pageWidth - marginX * 2
+  )
+
+  // force new page if disclaimer won't fit fully
+  if (yPosition + disclaimerLines.length * 5 > pageHeight - bottomMargin) {
+    doc.addPage()
+    yPosition = 20
+  }
+
+  doc.setFont("helvetica", "italic")
+  doc.setFontSize(9)
+  doc.text(disclaimerLines, marginX, yPosition)
+// ===== FOOTER WITH PAGE NUMBER =====
+const pageCount = doc.getNumberOfPages()
+
+for (let i = 1; i <= pageCount; i++) {
+  doc.setPage(i)
+  doc.setFontSize(8)
+  doc.setTextColor(120)
+  doc.text(
+    `Generated by TeleHealth AI • Page ${i} of ${pageCount}`,
+    pageWidth / 2,
+    pageHeight - 10,
+    { align: "center" }
+  )
+}
+  doc.save(`TeleHealth-Consultation-${Date.now()}.pdf`)
+}
   return (
     <>
       {/* Floating Chat Button */}
@@ -259,7 +415,7 @@ if (chatStep !== "symptoms") {
 
           {/* Input Area */}
           <div className="p-4 border-t border-primary/10 space-y-3">
-            {chatStep === "symptoms" && (
+            {chatStep === "symptoms" && chatMessages.some(m => m.sender === "bot") && (
               <button
                 onClick={exportChatToPDF}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-secondary/20 text-secondary border border-secondary/30 hover:bg-secondary/30 transition-all duration-300 font-medium text-sm"
@@ -268,7 +424,7 @@ if (chatStep !== "symptoms") {
                 Export Chat to PDF
               </button>
             )}
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <input
                 type="text"
                 value={currentInput}
@@ -277,6 +433,18 @@ if (chatStep !== "symptoms") {
                 placeholder="Type your response..."
                 className="flex-1 px-4 py-2 border border-primary/20 rounded-xl bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground placeholder:text-muted-foreground text-sm"
               />
+              {/* 🎤 MIC BUTTON — INSERTED HERE */}
+              <button
+              type="button"
+              onClick={handleMicClick}
+              className={`px-3 py-2 rounded-xl border ${
+              isListening
+            ? "bg-red-500 text-white animate-pulse"
+            : "bg-muted text-foreground"
+           }`}
+           >
+          <Mic size={16} />
+           </button>
               <button
                 onClick={handleChatSubmit}
                 disabled={!currentInput.trim()}
