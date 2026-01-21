@@ -66,6 +66,12 @@ export function Navbar() {
               AI Features
             </button>
             <Link
+              href="/about"
+              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors duration-200"
+            >
+              About
+            </Link>
+            <Link
               href="/login"
               className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors duration-200"
             >
@@ -116,6 +122,12 @@ export function Navbar() {
             >
               AI Features
             </button>
+            <Link
+              href="/about"
+              className="text-sm font-medium text-muted-foreground hover:text-primary transition block py-2"
+            >
+              About
+            </Link>
             <Link
               href="/login"
               className="text-sm font-medium text-muted-foreground hover:text-primary transition block py-2"
